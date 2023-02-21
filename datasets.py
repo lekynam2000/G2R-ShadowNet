@@ -14,6 +14,8 @@ class ImageDataset(Dataset):
         self.unaligned = unaligned
 
         self.files_A = sorted(glob.glob(os.path.join(root, '%s/train_A' % mode) + '/*.*'))
+        # print(self.files_A)
+        # print(os.path.join(root, '%s/train_A' % mode) + '/*.*')
         self.files_B = sorted(glob.glob(os.path.join(root, '%s/train_D' % mode) + '/*.*'))
         self.files_C = sorted(glob.glob(os.path.join(root, '%s/train_B' % mode) + '/*.*'))
         self.files_D = sorted(glob.glob(os.path.join(root, '%s/train_C' % mode) + '/*.*'))

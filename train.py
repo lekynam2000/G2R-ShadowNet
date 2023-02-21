@@ -3,6 +3,7 @@ import os
 import datetime
 import argparse
 import itertools
+from tqdm import tqdm
 import torchvision
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
@@ -12,8 +13,11 @@ from utils import LambdaLR
 from utils import weights_init_normal
 from model import Generator_S2F,Generator_F2S,Discriminator
 from datasets import ImageDataset
+from custom_utils.plt_utils import draw_loss
+import matplotlib.pyplot as plt
+plt.ioff()
 
-os.environ["CUDA_VISIBLE_DEVICES"]="7,3,1,2,0,5,6,4"
+#os.environ["CUDA_VISIBLE_DEVICES"]="7,3,1,2,0,5,6,4"
 torch.manual_seed(628)
 
 parser = argparse.ArgumentParser()
@@ -28,19 +32,22 @@ parser.add_argument('--cuda', action='store_true', help='use GPU computation')
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
 parser.add_argument('--snapshot_epochs', type=int, default=5, help='number of epochs of training')
 parser.add_argument('--iter_loss', type=int, default=100, help='average loss for n iterations')
+parser.add_argument('--gpu_id', type=int, default=0, help='gpu id in use')
+parser.add_argument('--output_dir', type=str, default="output", help='persist training state directory')
 opt = parser.parse_args()
 
 
 # ISTD
-opt.dataroot = '/home/liuzhihao/dataset/PAISTD8'
+opt.dataroot = '../dataset/g2rdata'
 
-if not os.path.exists('ckpt'):
-    os.mkdir('ckpt')
-opt.log_path = os.path.join('ckpt', str(datetime.datetime.now()) + '.txt')
+if not os.path.exists(opt.output_dir):
+    os.mkdir(opt.output_dir)
+opt.log_path = os.path.join(opt.output_dir, str(datetime.datetime.now()) + '.txt')
 
 if torch.cuda.is_available():
     opt.cuda = True
-
+    torch.cuda.set_device(opt.gpu_id)
+    print(f"using GPU: {torch.cuda.current_device()}")
 print(opt)
 
 ###### Definition of variables ######
@@ -105,7 +112,7 @@ open(opt.log_path, 'w').write(str(opt) + '\n\n')
 
 ###### Training ######
 for epoch in range(opt.epoch, opt.n_epochs):
-    for i, batch in enumerate(dataloader):
+    for i, batch in enumerate(tqdm(dataloader,mininterval=60)):
         # Set model input
         real_nsr = Variable(input_A.copy_(batch['A']))#non shadow region:input;step1-gt
         random_sr = Variable(input_B.copy_(batch['B']))#random real shadow region:gan training
@@ -189,15 +196,22 @@ for epoch in range(opt.epoch, opt.n_epochs):
             print(avg_log)
             open(opt.log_path, 'a').write(avg_log + '\n')
 
+    if (epoch + 1) % opt.snapshot_epochs == 0:
+        draw_loss([G_losses],["Generator Loss"],opt.iter_loss,opt.output_dir, "Generator_loss")
+
+        draw_loss([D_B_losses],["D_B_losses"],opt.iter_loss,opt.output_dir,"Discriminator_loss")
+
+
     # Update learning rates
     lr_scheduler_G.step()
     lr_scheduler_D_B.step()
 
 
     if epoch>90:
-        torch.save(netG_A2B.state_dict(), ('ckpt/netG_A2B_%d.pth' % (epoch + 1)))
-        torch.save(netG_1.state_dict(), ('ckpt/netG_1_%d.pth' % (epoch + 1)))
-        torch.save(netG_2.state_dict(), ('ckpt/netG_2_%d.pth' % (epoch + 1)))
-        torch.save(netD_B.state_dict(), ('ckpt/netD_B_%d.pth' % (epoch+1)))
+        #f"{opt.output_dir}/netG_A2B_{epoch+1}.pth"
+        torch.save(netG_A2B.state_dict(), f"{opt.output_dir}/netG_A2B_{epoch + 1}.pth")
+        torch.save(netG_1.state_dict(), f"{opt.output_dir}/netG_1_{epoch + 1}.pth")
+        torch.save(netG_2.state_dict(), f"{opt.output_dir}/netG_2_{epoch + 1}.pth")
+        torch.save(netD_B.state_dict(), f"{opt.output_dir}/netD_B_{epoch + 1}.pth")
 
     print('Epoch:{}'.format(epoch))

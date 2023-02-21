@@ -10,24 +10,27 @@ from skimage.transform import resize
 from model import Generator_S2F,Generator_F2S
 import warnings
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"]="0,6,5,1,7,4,2,3"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda', action='store_true', help='use GPU computation')
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
-parser.add_argument('--generator_1', type=str, default='ckpt/netG_1.pth', help='A2B generator checkpoint file')
-parser.add_argument('--generator_2', type=str, default='ckpt/netG_2.pth', help='A2B generator checkpoint file')
+parser.add_argument('--generator', type=str, default='ckpt/netG_1.pth', help='A2B generator checkpoint file')
+parser.add_argument('--refiner', type=str, default='ckpt/netG_2.pth', help='A2B generator checkpoint file')
+parser.add_argument('--savepath', type=str, default='../generate_G2R', help='generated images folder path')
+parser.add_argument('--dataroot_A', type=str, default='../dataset/ISTD_Dataset/test/test_A', help='Shadow image test path')
+parser.add_argument('--dataroot_B', type=str, default='../dataset/ISTD_Dataset/test/test_B', help='Mask of images test path')
+parser.add_argument('--gpu_id', type=int, default=0, help='gpu id in use')
+
 opt = parser.parse_args()
 
 ## ISTD
-opt.dataroot_A = '/home/liuzhihao/dataset/ISTD/test/test_A'
 opt.im_suf_A = '.png'
-# opt.dataroot_B = '/home/liuzhihao/dataset/ISTD/test/test_B'
-opt.dataroot_B = '/home/liuzhihao/BDRAR/test_A_mask_istd_6/'
+#opt.dataroot_B = '/home/liuzhihao/BDRAR/test_A_mask_istd_6/'
 opt.im_suf_B = '.png'
 if torch.cuda.is_available():
     opt.cuda = True
-    device = torch.device('cuda:0')
+    device = torch.device(f'cuda:{opt.gpu_id}')
+    print(f"Using GPU: {opt.gpu_id}")
 print(opt)
 
 
@@ -44,9 +47,9 @@ if opt.cuda:
 
 gt_list = [os.path.splitext(f)[0] for f in os.listdir(opt.dataroot_A) if f.endswith(opt.im_suf_A)]
 
-for ee in range(100,90,-1):
-    g1ckpt='ckpt/netG_1.pth'
-    g2ckpt='ckpt/netG_2.pth'
+for ee in range(100,99,-1):
+    g1ckpt = opt.generator
+    g2ckpt = opt.refiner
     # g1ckpt='ckpt/netG_1_%s.pth'%(ee)
     # g2ckpt='ckpt/netG_2_%s.pth'%(ee)
 
@@ -55,7 +58,7 @@ for ee in range(100,90,-1):
     netG_2.load_state_dict(torch.load(g2ckpt))
     netG_2.eval()
     
-    savepath='ckpt/B_%s_mask6'%(ee)
+    savepath = opt.savepath
     if not os.path.exists(savepath):
         os.makedirs(savepath)
     for idx, img_name in enumerate(gt_list):
