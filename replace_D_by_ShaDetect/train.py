@@ -15,6 +15,8 @@ from model import Generator_S2F,Generator_F2S,Discriminator
 from datasets import ImageDataset
 from custom_utils.plt_utils import draw_loss
 import matplotlib.pyplot as plt
+from BDRAR_util.model import BDRAR
+import torchvision.transforms as transforms
 plt.ioff()
 
 #os.environ["CUDA_VISIBLE_DEVICES"]="7,3,1,2,0,5,6,4"
@@ -34,6 +36,7 @@ parser.add_argument('--snapshot_epochs', type=int, default=5, help='number of ep
 parser.add_argument('--iter_loss', type=int, default=100, help='average loss for n iterations')
 parser.add_argument('--gpu_id', type=int, default=0, help='gpu id in use')
 parser.add_argument('--output_dir', type=str, default="output", help='persist training state directory')
+parser.add_argument('--pretrained_BDRAR', type=str, default="../BDRAR", help='Pretrained shadow detector dir')
 opt = parser.parse_args()
 
 
@@ -55,13 +58,20 @@ print(opt)
 netG_A2B = Generator_S2F()  # shadow to shadow_free
 netD_B = Discriminator()
 netG_1 = Generator_S2F()  # shadow to shadow_free
-netG_2 = Generator_F2S()  # shadow_free to shadow
+netG_2 = Generator_F2S()  # shadow to shadow_free
+shadow_detector = BDRAR()
+detector_imgsize = (416,416)
+detector_resize = transforms.Resize(detector_imgsize)
+no_mask = torch.zeros(detector_imgsize)
 
 if opt.cuda:
     netG_A2B.cuda()
     netD_B.cuda()
     netG_1.cuda()
     netG_2.cuda()
+    shadow_detector.cuda()
+shadow_detector.load_state_dict(torch.load(opt.pretrained_BDRAR))
+shadow_detector.eval()
 
 netG_A2B.apply(weights_init_normal)
 netD_B.apply(weights_init_normal)
