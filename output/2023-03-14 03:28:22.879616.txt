@@ -1,2 +1,0 @@
-Namespace(epoch=0, n_epochs=100, batchSize=1, lr=0.0002, decay_epoch=50, size=400, cuda=True, n_cpu=8, snapshot_epochs=5, iter_loss=100, gpu_id=0, output_dir='output', pretrained_BDRAR='../BDRAR/ckpt/BDRAR/3000.pth', dataroot='../dataset/ISTD_Dataset', log_path='output/2023-03-14 03:28:22.879616.txt')
-

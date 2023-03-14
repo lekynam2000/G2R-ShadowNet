@@ -54,9 +54,18 @@ if torch.cuda.is_available():
     print(f"using GPU: {torch.cuda.current_device()}")
 print(opt)
 
+to_pil = transforms.ToPILImage()
+gray_to_pil = transforms.Grayscale(num_output_channels=3)
+def save_img(img_cuda,name,is_gray=False):
+    if is_gray:
+        img_cuda = gray_to_pil(img_cuda)
+    img = 0.5*(img_cuda.detach().data+1.0)
+    img = (to_pil(img).data.squeeze(0).cpu())
+    img.save(f"{opt.output_dir}/{name}")
+
 ###### Definition of variables ######
 # Networks
-netG = Generator_F2S(4,3)  # shadow to shadow_free
+netG = Generator_F2S(3,3)  # shadow to shadow_free
 shadow_detector = BDRAR()
 
 no_mask = torch.zeros((opt.size,opt.size))
@@ -66,6 +75,8 @@ if opt.cuda:
     shadow_detector.cuda()
 shadow_detector.load_state_dict(torch.load(opt.pretrained_BDRAR))
 shadow_detector.eval()
+for param in shadow_detector.parameters():
+    param.requires_grad=False
 
 netG.apply(weights_init_normal)
 
@@ -74,7 +85,8 @@ criterion_GAN = torch.nn.MSELoss()  # lsgan
 # criterion_GAN = torch.nn.BCEWithLogitsLoss() #vanilla
 criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
-
+def mask_guided_L1(a,b,mask):
+    return criterion_identity(a*mask,b*mask)
 # Optimizers & LR schedulers
 
 optimizer_G = torch.optim.Adam(itertools.chain(netG.parameters()),
@@ -136,22 +148,22 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         # Generative loss
         gen_u12 = netG(img1,u12_mask)
-        u12_img_loss = criterion_identity((img1,gen_u12)*(u12_mask+2-mask1)/2)
+        u12_img_loss = mask_guided_L1(img1,gen_u12,(u12_mask+2-mask1)/2)
         pred_shad_u12 = (shadow_detector(gen_u12)+1)/2
         u12_shad_loss = criterion_identity(u12_mask,pred_shad_u12)
 
         gen_i12 = netG(img1,i12_mask)
-        i12_img_loss = criterion_identity((img1,gen_i12)*(mask1-i12_mask+2)/2)
+        i12_img_loss = mask_guided_L1(img1,gen_i12,(mask1-i12_mask+2)/2)
         pred_shad_i12 = (shadow_detector(gen_i12)+1)/2
         i12_shad_loss = criterion_identity(i12_mask,pred_shad_i12)
 
         gen_u21 = netG(img2,u21_mask)
-        u21_img_loss = criterion_identity((img2,gen_u21)*(u21_mask+2-mask2)/2)
+        u21_img_loss = mask_guided_L1(img2,gen_u21,(u21_mask+2-mask2)/2)
         pred_shad_u21 = (shadow_detector(gen_u21)+1)/2
         u21_shad_loss = criterion_identity(u21_mask,pred_shad_u21)
 
         gen_i21 = netG(img2,i21_mask)
-        i21_img_loss = criterion_identity((img2,gen_i21)*(mask2-i21_mask+2)/2)
+        i21_img_loss = mask_guided_L1(img2,gen_i21,(mask2-i21_mask+2)/2)
         pred_shad_i21 = (shadow_detector(gen_i21)+1)/2
         i21_shad_loss = criterion_identity(i21_mask,pred_shad_i21)
         
@@ -193,12 +205,29 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         draw_loss([D_B_losses],["D_B_losses"],opt.iter_loss,opt.output_dir,"Discriminator_loss")
 
+    if i==1 and (epoch + 1) % opt.snapshot_epochs == 0:
+        
+        save_img(gen_u12,f"gen_u12_e{epoch}.png")
+        save_img(u12_mask,f"mask_u12_e{epoch}.png",is_gray=True)
+        save_img(pred_shad_u12,f"mask_pred_u12_e{epoch}.png",is_gray=True)
+
+        save_img(gen_i12,f"gen_i12_e{epoch}.png")
+        save_img(i12_mask,f"mask_i12_e{epoch}.png",is_gray=True)
+        save_img(pred_shad_i12,f"mask_pred_i12_e{epoch}.png",is_gray=True)
+
+        save_img(gen_u21,f"gen_u21_e{epoch}.png")
+        save_img(u21_mask,f"mask_u21_e{epoch}.png",is_gray=True)
+        save_img(pred_shad_u21,f"mask_pred_u21_e{epoch}.png",is_gray=True)
+
+        save_img(gen_i21,f"gen_i21_e{epoch}.png")
+        save_img(i21_mask,f"mask_i21_e{epoch}.png",is_gray=True)
+        save_img(pred_shad_i21,f"mask_pred_i21_e{epoch}.png",is_gray=True)
 
     # Update learning rates
     lr_scheduler_G.step()
 
 
-    if epoch>99:
+    if epoch>49:
         #f"{opt.output_dir}/netG_A2B_{epoch+1}.pth"
         torch.save(netG.state_dict(), f"{opt.output_dir}/netG_{epoch + 1}.pth")
 
