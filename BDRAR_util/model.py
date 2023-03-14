@@ -106,7 +106,7 @@ class BDRAR(nn.Module):
         )
 
         for m in self.modules():
-            if isinstance(m, nn.ReLU) or isinstance(m, nn.Dropout):
+            if isinstance(m, nn.ReLU):
                 m.inplace = True
 
     def forward(self, x):
@@ -181,6 +181,6 @@ class BDRAR(nn.Module):
         predict4_lh = F.upsample(predict4_lh, size=x.size()[2:], mode='bilinear')
         fuse_predict = F.upsample(fuse_predict, size=x.size()[2:], mode='bilinear')
 
-        if self.training:
-            return fuse_predict, predict1_hl, predict2_hl, predict3_hl, predict4_hl, predict1_lh, predict2_lh, predict3_lh, predict4_lh
+        # if self.training:
+        #     return fuse_predict, predict1_hl, predict2_hl, predict3_hl, predict4_hl, predict1_lh, predict2_lh, predict3_lh, predict4_lh
         return F.sigmoid(fuse_predict)

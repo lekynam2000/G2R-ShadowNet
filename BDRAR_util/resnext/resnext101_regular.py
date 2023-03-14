@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 
-import resnext_101_32x4d_
-from config import resnext_101_32_path
+import BDRAR_util.resnext.resnext_101_32x4d_ as resnext_101_32x4d_
+from BDRAR_util.resnext.config import resnext_101_32_path
 
 
 class ResNeXt101(nn.Module):
