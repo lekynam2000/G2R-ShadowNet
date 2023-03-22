@@ -60,7 +60,7 @@ def save_img(img_cuda,name,is_gray=False):
     if is_gray:
         img_cuda = gray_to_pil(img_cuda)
     img = 0.5*(img_cuda.detach().data+1.0)
-    img = (to_pil(img).data.squeeze(0).cpu())
+    img = (to_pil(img.data.squeeze(0).cpu()))
     img.save(f"{opt.output_dir}/{name}")
 
 ###### Definition of variables ######
@@ -90,7 +90,7 @@ def mask_guided_L1(a,b,mask):
 # Optimizers & LR schedulers
 
 optimizer_G = torch.optim.Adam(itertools.chain(netG.parameters()),
-                               lr=opt.lr, betas=(0.5, 0.999))
+                               lr=opt.lr, betas=(0.9, 0.999))
 
 
 
@@ -119,9 +119,9 @@ dataloader = DataLoader(ImageDataset(opt.dataroot),
 
 curr_iter = 0
 G_losses_temp = 0
-D_B_losses_temp = 0
+D_losses_temp = 0
 G_losses = []
-D_B_losses = []
+D_losses = []
 
 open(opt.log_path, 'w').write(str(opt) + '\n\n')
 
@@ -149,25 +149,25 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Generative loss
         gen_u12 = netG(img1,u12_mask)
         u12_img_loss = mask_guided_L1(img1,gen_u12,(u12_mask+2-mask1)/2)
-        pred_shad_u12 = (shadow_detector(gen_u12)+1)/2
+        pred_shad_u12 = shadow_detector(gen_u12)*2-1
         u12_shad_loss = criterion_identity(u12_mask,pred_shad_u12)
 
         gen_i12 = netG(img1,i12_mask)
         i12_img_loss = mask_guided_L1(img1,gen_i12,(mask1-i12_mask+2)/2)
-        pred_shad_i12 = (shadow_detector(gen_i12)+1)/2
+        pred_shad_i12 = shadow_detector(gen_i12)*2-1
         i12_shad_loss = criterion_identity(i12_mask,pred_shad_i12)
 
         gen_u21 = netG(img2,u21_mask)
         u21_img_loss = mask_guided_L1(img2,gen_u21,(u21_mask+2-mask2)/2)
-        pred_shad_u21 = (shadow_detector(gen_u21)+1)/2
+        pred_shad_u21 = shadow_detector(gen_u21)*2-1
         u21_shad_loss = criterion_identity(u21_mask,pred_shad_u21)
 
         gen_i21 = netG(img2,i21_mask)
         i21_img_loss = mask_guided_L1(img2,gen_i21,(mask2-i21_mask+2)/2)
-        pred_shad_i21 = (shadow_detector(gen_i21)+1)/2
+        pred_shad_i21 = shadow_detector(gen_i21)*2-1
         i21_shad_loss = criterion_identity(i21_mask,pred_shad_i21)
         
-        loss_weights = [10, 10, 5, 5, 5, 5, 5, 5, 5, 5]
+        loss_weights = [10, 10, 5, 20, 5, 20, 5, 20, 5, 20]
         loss_arr = [loss_identity_11,loss_identity_22,u12_img_loss,u12_shad_loss,i12_img_loss,i12_shad_loss,u21_img_loss,u21_shad_loss,i21_img_loss,i21_shad_loss]
         # Total loss
         loss_G = 0
@@ -175,9 +175,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
             loss_G += w*v
         loss_G.backward()
 
+        with torch.no_grad():
+            loss_D = sum([u12_shad_loss,i12_shad_loss,u21_shad_loss,i21_shad_loss])
+
+
         #G_losses.append(loss_G.item())
         G_losses_temp += loss_G.item()
-
+        D_losses_temp += loss_D.item()
         optimizer_G.step()
         ###################################
 
@@ -186,48 +190,53 @@ for epoch in range(opt.epoch, opt.n_epochs):
         curr_iter += 1
 
         if (i+1) % opt.iter_loss == 0:
-            log = f"iter {curr_iter}, loss_arr = {loss_arr}"
+            log = f"iter {curr_iter}, loss_arr = {[x.item() for x in loss_arr]}"
             print(log)
             open(opt.log_path, 'a').write(log + '\n')
 
             G_losses.append(G_losses_temp / opt.iter_loss)
-            D_B_losses.append(0)
+            D_losses.append(D_losses_temp/ opt.iter_loss)
             G_losses_temp = 0
-            D_B_losses_temp = 0
+            D_losses_temp = 0
 
             avg_log = '[the last %d iters], [loss_G %.5f]' \
                       % (opt.iter_loss, G_losses[G_losses.__len__()-1])
             print(avg_log)
             open(opt.log_path, 'a').write(avg_log + '\n')
 
+        if i==1 and (epoch + 1) % opt.snapshot_epochs == 0:
+            save_img(img1,f"e{epoch}_img1.png")
+            save_img(img2,f"e{epoch}_img2.png")
+            save_img(mask1,f"e{epoch}_mask1.png",is_gray=True)
+            save_img(mask2,f"e{epoch}_mask2.png",is_gray=True)
+
+            save_img(gen_u12,f"e{epoch}_gen_u12.png")
+            save_img(u12_mask,f"e{epoch}_mask_u12.png",is_gray=True)
+            save_img(pred_shad_u12,f"e{epoch}_mask_pred_u12.png",is_gray=True)
+
+            save_img(gen_i12,f"e{epoch}_gen_i12.png")
+            save_img(i12_mask,f"e{epoch}_mask_i12.png",is_gray=True)
+            save_img(pred_shad_i12,f"e{epoch}_mask_pred_i12.png",is_gray=True)
+
+            save_img(gen_u21,f"e{epoch}_gen_u21.png")
+            save_img(u21_mask,f"e{epoch}_mask_u21.png",is_gray=True)
+            save_img(pred_shad_u21,f"e{epoch}_mask_pred_u21.png",is_gray=True)
+
+            save_img(gen_i21,f"e{epoch}_gen_i21.png")
+            save_img(i21_mask,f"e{epoch}_mask_i21.png",is_gray=True)
+            save_img(pred_shad_i21,f"e{epoch}_mask_pred_i21.png",is_gray=True)
+
     if (epoch + 1) % opt.snapshot_epochs == 0:
         draw_loss([G_losses],["Generator Loss"],opt.iter_loss,opt.output_dir, "Generator_loss")
 
-        draw_loss([D_B_losses],["D_B_losses"],opt.iter_loss,opt.output_dir,"Discriminator_loss")
+        draw_loss([D_losses],["D_B_losses"],opt.iter_loss,opt.output_dir,"Discriminator_loss")
 
-    if i==1 and (epoch + 1) % opt.snapshot_epochs == 0:
-        
-        save_img(gen_u12,f"gen_u12_e{epoch}.png")
-        save_img(u12_mask,f"mask_u12_e{epoch}.png",is_gray=True)
-        save_img(pred_shad_u12,f"mask_pred_u12_e{epoch}.png",is_gray=True)
-
-        save_img(gen_i12,f"gen_i12_e{epoch}.png")
-        save_img(i12_mask,f"mask_i12_e{epoch}.png",is_gray=True)
-        save_img(pred_shad_i12,f"mask_pred_i12_e{epoch}.png",is_gray=True)
-
-        save_img(gen_u21,f"gen_u21_e{epoch}.png")
-        save_img(u21_mask,f"mask_u21_e{epoch}.png",is_gray=True)
-        save_img(pred_shad_u21,f"mask_pred_u21_e{epoch}.png",is_gray=True)
-
-        save_img(gen_i21,f"gen_i21_e{epoch}.png")
-        save_img(i21_mask,f"mask_i21_e{epoch}.png",is_gray=True)
-        save_img(pred_shad_i21,f"mask_pred_i21_e{epoch}.png",is_gray=True)
 
     # Update learning rates
     lr_scheduler_G.step()
 
 
-    if epoch>49:
+    if (epoch + 1) % opt.snapshot_epochs == 0:
         #f"{opt.output_dir}/netG_A2B_{epoch+1}.pth"
         torch.save(netG.state_dict(), f"{opt.output_dir}/netG_{epoch + 1}.pth")
 

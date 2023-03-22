@@ -56,15 +56,16 @@ class ImageDataset(Dataset):
     def __getitem__(self, index):
         
         item_A1 = Image.open(self.files_A[index % len(self.files_A)])
-        item_B1 = Image.open(self.files_A[index % len(self.files_B)])
+        item_B1 = Image.open(self.files_B[index % len(self.files_B)])
         item_A1,item_B1 = crop(item_A1,item_B1)
         item_A1,item_B1 = flip(item_A1,item_B1)
         item_B1 = TF.to_grayscale(item_B1)
         item_A1 = self.normalizeA(item_A1)
         item_B1 = self.normalizeB(item_B1)
 
-        item_A2 = Image.open(self.files_A[random.randint(0, len(self.files_A) - 1)])
-        item_B2 = Image.open(self.files_A[random.randint(0, len(self.files_B) - 1)])
+        index_2 = random.randint(0, len(self.files_A) - 1)
+        item_A2 = Image.open(self.files_A[index_2])
+        item_B2 = Image.open(self.files_B[index_2])
         item_A2,item_B2 = crop(item_A2,item_B2)
         item_A2,item_B2 = flip(item_A2,item_B2)
         item_B2 = TF.to_grayscale(item_B2)
@@ -94,7 +95,7 @@ class ImageDataset(Dataset):
         u12_mask = torch.max(mask1,mask2_shifted)
         i12_mask = torch.min(mask1,mask2_shifted)
         u21_mask = torch.max(mask2,mask1_shifted)
-        i21_mask = torch.max(mask2,mask1_shifted)
+        i21_mask = torch.min(mask2,mask1_shifted)
 
         return u12_mask,i12_mask,u21_mask,i21_mask 
 

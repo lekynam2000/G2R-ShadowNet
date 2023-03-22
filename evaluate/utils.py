@@ -16,16 +16,16 @@ def compare(gt,est,resize=False):
     result=dict()
     raw_gt = Image.open(gt).convert('RGB')
     raw_est = Image.open(est).convert('RGB')
-    raw_gt_lab = Image.open(gt).convert('LAB')
-    raw_est_lab = Image.open(est).convert('LAB')
+    # raw_gt_lab = Image.open(gt).convert('LAB')
+    # raw_est_lab = Image.open(est).convert('LAB')
     if resize:
         size = (400,400)
         raw_gt = raw_gt.resize(size)
         raw_est = raw_est.resize(size)
     gt_img = asarray(raw_gt)
     est_img = asarray(raw_est)
-    gt_img_lab = asarray(raw_gt_lab)
-    est_img_lab = asarray(raw_est_lab)
+    # gt_img_lab = asarray(raw_gt_lab)
+    # est_img_lab = asarray(raw_est_lab)
     
 
     #print(f"gt_img.shape: {gt_img.shape} est_img.shape: {est_img.shape}") 
@@ -33,7 +33,7 @@ def compare(gt,est,resize=False):
    
     result["psnr"] = psnr(gt_img, est_img,data_range=255) 
     result["rmse"] = math.sqrt(mse(gt_img, est_img))
-    result["rmse_lab"] = math.sqrt(mse(gt_img_lab, est_img_lab))
+    # result["rmse_lab"] = math.sqrt(mse(gt_img_lab, est_img_lab))
     result["ssim"] = ssim(gt_img,est_img,channel_axis=2)
     
     return result
